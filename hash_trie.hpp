@@ -177,7 +177,7 @@ namespace hamt {
             }
         }
 
-        node( node_type type ): m_type( type ), m_id(dbg_get_next_id()) {
+        explicit node( node_type type ): m_type( type ), m_id(dbg_get_next_id()) {
             std::cout << m_id << " @ 0x" << std::hex << (unsigned long)this << " " << typeName() << "()" << std::endl;
             dbg_addref("==", 1);
         }
@@ -201,7 +201,7 @@ namespace hamt {
         }
 
 #elif defined(HAMT_DEBUG_RC)
-        node( node_type type ): m_type( type ) {
+        explicit node( node_type type ): m_type( type ) {
             dbg_addref("==", 1);
         }
         ~node() = default;
@@ -264,7 +264,7 @@ namespace hamt {
 
         // Creates a new leaf_node type with enough additional storage for
         // size items - but does not populate the array
-        static auto create_unpopulated(size_t size, size_t hash) {
+        static auto create_unpopulated( size_t size, size_t hash ) {
             assert( size >=1 );
             auto temp = std::make_unique<unsigned char[]>(storage_size(size) );
             auto leaf_ptr = new(temp.get()) leaf_node( size, hash );
@@ -319,7 +319,11 @@ namespace hamt {
         };
 
 
-        branch_node() : node( node_type::branch ) {}
+        explicit branch_node( size_t size, size_t bitmap )
+        :   node( node_type::branch ),
+            m_size( size ),
+            m_bitmap( bitmap )
+        {}
 
         ~branch_node() {
             auto len = size();
@@ -340,34 +344,32 @@ namespace hamt {
 
         // Creates a new branch_node type with enough additional storage for
         // size items - but does not populate the array
-        static auto create_unpopulated(size_t size) {
+        static auto create_unpopulated( size_t size, size_t bitmap ) {
             assert( size <= 32 );
             auto temp = std::make_unique<unsigned char[]>(storage_size(size) );
 
-            auto node_ptr = new(temp.get()) branch_node;
+            auto node_ptr = new(temp.get()) branch_node( size, bitmap );
             temp.release();
-            node_ptr->m_size = size;
             return std::unique_ptr<branch_node>( node_ptr );
         }
 
     public:
         static auto create_empty() -> std::unique_ptr<branch_node> {
-            auto node = create_unpopulated(1);
-            node->m_bitmap = 0;
+            auto node = create_unpopulated( 1, 0 );
             node->m_size = 0;
             return node;
         }
 
         static auto create_single(sparse_index index, node const *child) -> std::unique_ptr<branch_node> {
-            auto node = create_unpopulated(1);
+            auto node = create_unpopulated( 1, static_cast<size_t>( index.bit_position() ) );
             node->m_children[0] = child;
-            node->m_bitmap = static_cast<size_t>( index.bit_position() );
             return node;
         }
 
         static auto create_pair(sparse_index index1, leaf_node<T> const *leaf1, sparse_index index2,
                                 leaf_node<T> const *leaf2) -> std::unique_ptr<branch_node> {
-            auto node = create_unpopulated(2);
+            auto bitmap = static_cast<size_t>( index1.bit_position() | index2.bit_position() );
+            auto node = create_unpopulated( 2, bitmap );
             auto children = &node->m_children[0];
             if( index1.value() >  index2.value() ) {
                 children[0] = leaf2;
@@ -377,17 +379,17 @@ namespace hamt {
                 children[0] = leaf1;
                 children[1] = leaf2;
             }
-            node->m_bitmap = static_cast<size_t>( index1.bit_position() | index2.bit_position() );
             return node;
         }
 
         auto with_inserted(sparse_index sparseIndex, node const *child) const -> std::unique_ptr<branch_node> {
             auto originalSize = size();
+            auto bitmap = m_bitmap | sparseIndex.bit_position();
 
             // If adding new we need to offset later nodes
             assert( ( m_bitmap & sparseIndex.bit_position() ) == 0 );
 
-            auto node = create_unpopulated(originalSize + 1);
+            auto node = create_unpopulated( originalSize + 1, bitmap );
 
             auto splitPoint = sparseIndex.toCompact( m_bitmap ).value();
 
@@ -402,18 +404,17 @@ namespace hamt {
                 auto sharedNode = node->m_children[i+1] = m_children[i];
                 addref(sharedNode);
             }
-
-            node->m_bitmap = m_bitmap | sparseIndex.bit_position();
             return node;
         }
 
         auto with_replaced(sparse_index sparseIndex, node const *child) const -> std::unique_ptr<branch_node> {
             auto originalSize = size();
+            auto bitmap = m_bitmap | sparseIndex.bit_position();
 
             // If replacing a node we overwrite existing in place
             assert( ( m_bitmap & sparseIndex.bit_position() ) != 0 );
 
-            auto node = create_unpopulated(originalSize);
+            auto node = create_unpopulated( originalSize, bitmap );
 
             auto splitPoint = sparseIndex.toCompact( m_bitmap ).value();
 
@@ -428,8 +429,6 @@ namespace hamt {
                 auto sharedNode = node->m_children[i] = m_children[i];
                 addref(sharedNode);
             }
-
-            node->m_bitmap = m_bitmap | sparseIndex.bit_position();
             return node;
         }
 
