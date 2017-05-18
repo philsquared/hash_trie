@@ -1,0 +1,1 @@
+cmake-build-release/HamtBench -s 100 -r html -f ".*<hash>::find" -o "BenchmarkResults/find_hash_e7.html" -i 10000000
