@@ -96,7 +96,11 @@ namespace hamt {
             size_t shiftedHash;
             size_t chunk;
 
-            explicit chunked_hash( size_t hash ) : hash( hash ), shiftedHash( hash ), chunk( shiftedHash & chunkMask ) {}
+            explicit chunked_hash( size_t hash )
+            :   hash( hash ),
+                shiftedHash( hash ),
+                chunk( shiftedHash & chunkMask )
+            {}
 
             chunked_hash& operator ++() {
                 shiftedHash >>= bitsPerChunk;
@@ -255,6 +259,12 @@ namespace hamt {
         union { ;
             T m_values[1];
         };
+
+        leaf_node( size_t size, size_t hash )
+        :   node( node_type::leaf ),
+            m_size( size ),
+            m_hash( hash )
+        {}
 
         leaf_node( size_t size, size_t hash ) : node( node_type::leaf ), m_size( size ), m_hash( hash ) {}
         ~leaf_node() {
@@ -678,7 +688,8 @@ namespace hamt {
 
         return path.leaf()
                ? add_value_at_leaf( path, std::forward<U>(value) )
-               : add_value_at_currently_unset_position( path, leaf_node<T>::create(std::forward<U>(value), path.whole_hash() ) );
+               : add_value_at_currently_unset_position
+                       ( path, leaf_node<T>::create(std::forward<U>(value), path.whole_hash() ) );
     }
 
     template<typename T>
@@ -759,6 +770,7 @@ namespace hamt {
     template<typename T>
     class shared_hash_trie { // NOLINT
         static_assert( std::is_trivially_copyable<hash_trie_data<T>>::value, "hash_trie_data must be trivially copyable to be used atomically" );
+                       "hash_trie_data must be trivially copyable to be used atomically" );
 
         std::atomic<hash_trie_data<T>> m_data;
 
@@ -790,8 +802,12 @@ namespace hamt {
         void update_with(L const &updateTask);
 
         // "low level" compare-exchange wrapper - use transation
-        auto reset( hash_trie_data<T>& originalData, hash_trie_data<T>& newData ) -> bool {
-            if( !m_data.compare_exchange_strong( originalData, newData, std::memory_order_release, std::memory_order_relaxed ) )
+        auto reset( hash_trie_data<T>& originalData,
+                    hash_trie_data<T>& newData ) -> bool {
+            if( !m_data.compare_exchange_strong
+                    ( originalData, newData,
+                      std::memory_order_release,
+                      std::memory_order_relaxed ) )
                 return false;
 
             release( originalData.m_root );
