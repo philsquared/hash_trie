@@ -720,8 +720,9 @@ namespace hamt {
             release( m_data.m_root );
         }
 
-        hash_trie& operator = ( hash_trie other ) {
-            swap( other );
+        hash_trie& operator = ( hash_trie const& other ) {
+            hash_trie temp( other );
+            swap( temp );
             return *this;
         }
         hash_trie& operator = ( hash_trie&& other ) noexcept(false) {
@@ -774,14 +775,15 @@ namespace hamt {
 
         std::atomic<hash_trie_data<T>> m_data;
 
+        static auto makeEmptyData() -> hash_trie_data<T> {
+            return { branch_node<T>::create_empty().release(), 0 };
+        }
+
     public:
         shared_hash_trie& operator = ( shared_hash_trie const& ) = delete;
         shared_hash_trie& operator = ( shared_hash_trie&& ) = delete;
 
-        shared_hash_trie() {
-            auto root = branch_node<T>::create_empty();
-            m_data.store( { root.release(), 0 }, std::memory_order_relaxed );
-        }
+        shared_hash_trie() : m_data( makeEmptyData() ) {}
 
         explicit shared_hash_trie( hash_trie<T> const& hash_trie ) {
             m_data.store( hash_trie.data(), std::memory_order_relaxed );
@@ -790,10 +792,10 @@ namespace hamt {
 
         auto data() const -> hash_trie_data<T> {
             return m_data.load( std::memory_order_relaxed );
-
         }
-        operator hash_trie<T>() const { // NOLINT
-            return hash_trie<T>( data() );
+
+        auto get() const -> hash_trie<T> {
+            return data();
         }
 
         auto start_transaction() -> hash_trie_transaction<T>;
@@ -801,7 +803,7 @@ namespace hamt {
         template<typename L>
         void update_with(L const &updateTask);
 
-        // "low level" compare-exchange wrapper - use transation
+        // "low level" compare-exchange wrapper - use transaction
         auto reset( hash_trie_data<T>& originalData,
                     hash_trie_data<T>& newData ) -> bool {
             if( !m_data.compare_exchange_strong
@@ -831,11 +833,11 @@ namespace hamt {
             addref( m_baseData.m_root );
         }
 
-        operator hash_trie<T>() const { // NOLINT
+        auto get() const -> hash_trie<T> {
             return hash_trie<T>( m_baseData );
         }
 
-        auto commit( hash_trie<T>& newHashTrie ) -> bool {
+        auto try_commit(hash_trie<T> &newHashTrie) -> bool {
             return m_shared.reset( m_baseData, newHashTrie.data() );
         }
 
@@ -850,13 +852,10 @@ namespace hamt {
                     break;
 
                 // try to commit, and if successful we're done
-                if( commit( copy ) )
+                if(try_commit(copy) )
                     break;
 
-                // if we couldn't commit, rebase and try again
-                release( m_baseData.m_root );
-                m_baseData = m_shared.data();
-                addref( m_baseData.m_root );
+                // m_baseData has been updated with new base
             };
         }
     };
