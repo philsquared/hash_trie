@@ -146,7 +146,8 @@ namespace hamt {
 
     enum class node_type { branch, leaf };
 
-    struct node {
+    class node {
+    public:
         mutable std::atomic<size_t> m_refCount { 1 };
         node_type m_type;
 
@@ -156,12 +157,40 @@ namespace hamt {
         node& operator=( node const& ) = delete;
         node& operator=( node&& ) = delete;
 
+    public:
 #ifdef HAMT_DEBUG_RC
         static auto dbg_get_total_refs() -> size_t& {
             static size_t s_dbgTotalRefs = 0;
             return s_dbgTotalRefs;
         }
 #endif
+
+#ifdef HAMT_DEBUG_VERBOSE
+        void dbg_addref(char const *type, size_t refCount) const {
+            dbg_get_total_refs()++;
+            dbgPrintRefs(type, refCount);
+        }
+
+        void dbg_release(size_t refCount) const {
+            dbg_get_total_refs()--;
+            dbgPrintRefs("--", refCount - 1);
+            assert(refCount > 0);
+        }
+#elif defined(HAMT_DEBUG_RC)
+        void dbg_addref(char const *type, size_t refCount) const {
+            dbg_get_total_refs()++;
+        }
+
+        void dbg_release(size_t refCount) const {
+            dbg_get_total_refs()--;
+            assert(refCount > 0);
+        }
+#else
+        void dbg_addref(char const *, size_t) const {}
+        void dbg_release(size_t) const {}
+#endif
+
+    protected:
 
 #ifdef HAMT_DEBUG_VERBOSE
         int m_id;
@@ -189,37 +218,14 @@ namespace hamt {
             std::cout << m_id << " @ 0x" << std::hex << (unsigned long)this << " " << type << " " << refCount << "/ " << dbg_get_total_refs() << std::endl;
         }
 
-        void dbg_addref(char const *type, size_t refCount) const {
-            dbg_get_total_refs()++;
-            dbgPrintRefs(type, refCount);
-        }
-
-        void dbg_release(size_t refCount) const {
-            dbg_get_total_refs()--;
-            dbgPrintRefs("--", refCount - 1);
-            assert(refCount > 0);
-        }
-
 #elif defined(HAMT_DEBUG_RC)
         explicit node( node_type type ): m_type( type ) {
             dbg_addref("==", 1);
         }
         ~node() = default;
-
-        void dbg_addref(char const *type, size_t refCount) const {
-            dbg_get_total_refs()++;
-        }
-
-        void dbg_release(size_t refCount) const {
-            dbg_get_total_refs()--;
-            assert(refCount > 0);
-        }
 #else
         explicit node( node_type type ) : m_type( type ) {}
         ~node() = default;
-
-        void dbg_addref(char const *, size_t) const {}
-        void dbg_release(size_t) const {}
 #endif
     };
 
@@ -241,7 +247,7 @@ namespace hamt {
     }
 
     template<typename T>
-    class leaf_node : public node {
+    class leaf_node : public node { // NOLINT
         friend class std::default_delete<leaf_node>;
 
         size_t m_size;
@@ -319,7 +325,7 @@ namespace hamt {
         };
 
 
-        explicit branch_node( size_t size, size_t bitmap )
+        explicit branch_node( size_t size, size_t bitmap ) // NOLINT
         :   node( node_type::branch ),
             m_size( size ),
             m_bitmap( bitmap )
@@ -506,7 +512,7 @@ namespace hamt {
                 if( --m_depth > 0 ) {
                     return operator++();
                 }
-                else {
+                else { // NOLINT
                     m_leaf = nullptr;
                     return *this;
                 }
@@ -542,7 +548,7 @@ namespace hamt {
         size_t m_size = 0;
 
     public:
-        path( T const& value, branch_node<T> const* root ) : m_chunkedHash( std::hash<T>()( value ) ) {
+        path( T const& value, branch_node<T> const* root ) : m_chunkedHash( std::hash<T>()( value ) ) { // NOLINT
             size_t size = 0;
             assert( root != nullptr );
             auto lastBranch = root;
@@ -614,7 +620,7 @@ namespace hamt {
             newChildBranch.release();
             return newParentBranch;
         }
-        else {
+        else { // NOLINT
             auto newBranch = branch_node<T>::create_pair(sparse_index(existingHash.chunk), existingLeaf,
                                                          sparse_index(newHash.chunk), newLeaf.get());
             newLeaf.release();
@@ -647,7 +653,7 @@ namespace hamt {
         }
 
         // Different hash, so add branches to the point they diverge
-        else {
+        else { // NOLINT
             existingHash += path.size();
             auto newChildBranch = extend
                     ( existingHash + 1,
@@ -666,7 +672,7 @@ namespace hamt {
 
     template<typename U, typename T>
     static auto inserted( branch_node<T> const* root, U &&value) -> branch_node<T> const* {
-        static_assert( sizeof( T( value ) ) > 0, "value must be convertible to T" );
+        static_assert( std::is_constructible<T, decltype(std::forward<U>(value))>::value, "value must be convertible to T" );
 
         path<T> path( value, root );
 
@@ -691,11 +697,11 @@ namespace hamt {
     public:
         hash_trie() : m_data( makeEmptyData() ) {}
 
-        hash_trie( hash_trie_data<T> const& data ) : m_data( data ) {
+        explicit hash_trie( hash_trie_data<T> const& data ) : m_data( data ) {
             addref( m_data.m_root );
         }
         hash_trie( hash_trie<T> const& other ) : hash_trie( other.m_data ) {}
-        hash_trie( hash_trie<T>&& other ) : hash_trie() {
+        hash_trie( hash_trie<T>&& other ) noexcept(false) : hash_trie() {
             swap( other );
         }
 
@@ -707,7 +713,7 @@ namespace hamt {
             swap( other );
             return *this;
         }
-        hash_trie& operator = ( hash_trie&& other ) {
+        hash_trie& operator = ( hash_trie&& other ) noexcept(false) {
             if( !empty() ) {
                 hash_trie emptyTemp;
                 swap( emptyTemp );
@@ -716,7 +722,7 @@ namespace hamt {
             return *this;
         }
 
-        void swap( hash_trie& other ) {
+        void swap( hash_trie& other ) noexcept {
             std::swap( m_data.m_root, other.m_data.m_root );
             std::swap( m_data.m_size, other.m_data.m_size );
         }
@@ -751,7 +757,7 @@ namespace hamt {
     class hash_trie_transaction;
 
     template<typename T>
-    class shared_hash_trie {
+    class shared_hash_trie { // NOLINT
         static_assert( std::is_trivially_copyable<hash_trie_data<T>>::value, "hash_trie_data must be trivially copyable to be used atomically" );
 
         std::atomic<hash_trie_data<T>> m_data;
@@ -765,7 +771,7 @@ namespace hamt {
             m_data.store( { root.release(), 0 }, std::memory_order_relaxed );
         }
 
-        shared_hash_trie( hash_trie<T> const& hash_trie ) {
+        explicit shared_hash_trie( hash_trie<T> const& hash_trie ) {
             m_data.store( hash_trie.data(), std::memory_order_relaxed );
             addref( hash_trie.data().m_root );
         }
@@ -774,8 +780,8 @@ namespace hamt {
             return m_data.load( std::memory_order_relaxed );
 
         }
-        operator hash_trie<T>() const {
-            return data();
+        operator hash_trie<T>() const { // NOLINT
+            return hash_trie<T>( data() );
         }
 
         auto start_transaction() -> hash_trie_transaction<T>;
@@ -802,14 +808,14 @@ namespace hamt {
         shared_hash_trie<T>& m_shared;
 
     public:
-        hash_trie_transaction( shared_hash_trie<T>& shared )
-                : m_baseData( shared.data() ),
-                  m_shared( shared )
+        explicit hash_trie_transaction( shared_hash_trie<T>& shared )
+        : m_baseData( shared.data() ),
+          m_shared( shared )
         {
             addref( m_baseData.m_root );
         }
 
-        operator hash_trie<T>() const {
+        operator hash_trie<T>() const { // NOLINT
             return hash_trie<T>( m_baseData );
         }
 
