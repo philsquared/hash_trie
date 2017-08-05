@@ -1,6 +1,6 @@
 /*
  *  Catch v2.0.0-develop.1
- *  Generated: 2017-08-05 11:29:14.014889
+ *  Generated: 2017-08-05 21:40:35.052014
  *  ----------------------------------------------------------
  *  This file has been merged from multiple headers. Please don't edit it directly
  *  Copyright (c) 2017 Two Blue Cubes Ltd. All rights reserved.
@@ -408,6 +408,7 @@ namespace Catch {
     public: // named queries
         auto empty() const noexcept -> bool;
         auto size() const noexcept -> size_type;
+        auto numberOfCharacters() const noexcept -> size_type;
         auto c_str() const -> char const*;
 
     public: // substrings and searches
@@ -8427,6 +8428,8 @@ namespace Catch {
 
         auto empty() const noexcept -> bool;
         auto size() const noexcept -> size_type;
+        auto numberOfCharacters() const noexcept -> size_type;
+
         auto c_str() const noexcept -> char const*;
     };
 
@@ -8591,6 +8594,9 @@ namespace Catch {
     }
     auto String::size() const noexcept -> size_type {
         return m_data->size;
+    }
+    auto String::numberOfCharacters() const noexcept -> size_type {
+        return StringRef( *this ).numberOfCharacters();
     }
     auto String::c_str() const noexcept -> char const* {
         return m_data->chars;
@@ -8951,6 +8957,22 @@ namespace Catch {
 
     auto StringRef::size() const noexcept -> size_type {
         return m_size;
+    }
+    auto StringRef::numberOfCharacters() const noexcept -> size_type {
+        size_type noChars = m_size;
+        // Make adjustments for uft encodings
+        for( size_type i=0; i < m_size; ++i ) {
+            char c = m_start[i];
+            if( ( c & 0b11000000 ) == 0b11000000 ) {
+                if( ( c & 0b11100000 ) == 0b11000000 )
+                    noChars--;
+                else if( ( c & 0b11110000 ) == 0b11100000 )
+                    noChars-=2;
+                else if( ( c & 0b11111000 ) == 0b11110000 )
+                    noChars-=3;
+            }
+        }
+        return noChars;
     }
 
     auto operator + ( StringRef const& lhs, StringRef const& rhs ) -> String {
@@ -10820,6 +10842,8 @@ namespace {
 
         friend TablePrinter& operator << ( TablePrinter& tp, ColumnBreak ) {
             auto colStr = tp.m_oss.str();
+            // This takes account of utf8 encodings
+            auto strSize = Catch::StringRef( colStr.c_str(), colStr.size() ).numberOfCharacters();
             tp.m_oss.str("");
             tp.open();
             if( tp.m_currentColumn == static_cast<int>(tp.m_columnInfos.size()-1) ) {
@@ -10831,8 +10855,8 @@ namespace {
             tp.m_currentColumn++;
 
             auto colInfo = tp.m_columnInfos[tp.m_currentColumn];
-            auto padding = ( colStr.size()+2 < static_cast<size_t>( colInfo.width ) )
-                ? std::string( colInfo.width-(colStr.size()+2), ' ' )
+            auto padding = ( strSize+2 < static_cast<size_t>( colInfo.width ) )
+                ? std::string( colInfo.width-(strSize+2), ' ' )
                 : std::string();
             if( colInfo.justification == ColumnInfo::Left )
                 tp.m_os << " " << colStr << padding << " |";
@@ -10848,6 +10872,79 @@ namespace {
             }
             tp.m_os << Catch::getBoxCharsAcross() << "\n";
             return tp;
+        }
+    };
+
+    class Duration {
+        enum class Unit {
+            Auto,
+            Nanoseconds,
+            Microseconds,
+            Milliseconds,
+            Seconds,
+            Minutes
+        };
+        static const uint64_t s_nanosecondsInAMicrosecond = 1000;
+        static const uint64_t s_nanosecondsInAMillisecond = 1000*s_nanosecondsInAMicrosecond;
+        static const uint64_t s_nanosecondsInASecond = 1000*s_nanosecondsInAMillisecond;
+        static const uint64_t s_nanosecondsInAMinute = 60*s_nanosecondsInASecond;
+
+        uint64_t m_inNanoseconds;
+        Unit m_units;
+
+    public:
+        Duration( uint64_t inNanoseconds, Unit units = Unit::Auto )
+        :   m_inNanoseconds( inNanoseconds ),
+            m_units( units )
+        {
+            if( m_units == Unit::Auto ) {
+                if( m_inNanoseconds < s_nanosecondsInAMicrosecond )
+                    m_units = Unit::Nanoseconds;
+                else if( m_inNanoseconds < s_nanosecondsInAMillisecond )
+                    m_units = Unit::Microseconds;
+                else if( m_inNanoseconds < s_nanosecondsInASecond )
+                    m_units = Unit::Milliseconds;
+                else if( m_inNanoseconds < s_nanosecondsInAMinute )
+                    m_units = Unit::Seconds;
+                else
+                    m_units = Unit::Minutes;
+            }
+
+        }
+
+        auto value() const -> double {
+            switch( m_units ) {
+                case Unit::Microseconds:
+                    return m_inNanoseconds / static_cast<double>( s_nanosecondsInAMicrosecond );
+                case Unit::Milliseconds:
+                    return m_inNanoseconds / static_cast<double>( s_nanosecondsInAMillisecond );
+                case Unit::Seconds:
+                    return m_inNanoseconds / static_cast<double>( s_nanosecondsInASecond );
+                case Unit::Minutes:
+                    return m_inNanoseconds / static_cast<double>( s_nanosecondsInAMinute );
+                default:
+                    return static_cast<double>( m_inNanoseconds );
+            }
+        }
+        auto unitsAsString() const -> std::string {
+            switch( m_units ) {
+                case Unit::Nanoseconds:
+                    return "ns";
+                case Unit::Microseconds:
+                    return "µs";
+                case Unit::Milliseconds:
+                    return "ms";
+                case Unit::Seconds:
+                    return "s";
+                case Unit::Minutes:
+                    return "m";
+                default:
+                    return "** internal error **";
+            }
+
+        }
+        friend auto operator << ( std::ostream& os, Duration const& duration ) -> std::ostream& {
+            return os << duration.value() << " " << duration.unitsAsString();
         }
     };
 }
@@ -10936,11 +11033,11 @@ namespace Catch {
             }
         }
         void benchmarkEnded( BenchmarkStats const& stats ) override {
-            // !TBD: report average times in natural units?
+            Duration average( stats.elapsedTimeInNanoseconds/stats.iterations );
             m_tablePrinter
                     << stats.iterations << ColumnBreak()
                     << stats.elapsedTimeInNanoseconds << ColumnBreak()
-                    << stats.elapsedTimeInNanoseconds/stats.iterations << " ns" << ColumnBreak();
+                    << average << ColumnBreak();
         }
 
         void testCaseEnded( TestCaseStats const& _testCaseStats ) override {
