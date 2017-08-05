@@ -1,6 +1,6 @@
 /*
  *  Catch v2.0.0-develop.1
- *  Generated: 2017-08-05 21:40:35.052014
+ *  Generated: 2017-08-05 22:24:30.291955
  *  ----------------------------------------------------------
  *  This file has been merged from multiple headers. Please don't edit it directly
  *  Copyright (c) 2017 Two Blue Cubes Ltd. All rights reserved.
@@ -9120,7 +9120,7 @@ namespace Catch {
             else {
                 if( c == ']' ) {
                     TestCaseInfo::SpecialProperties prop = parseSpecialTag( tag );
-                    if( prop == TestCaseInfo::IsHidden )
+                    if( ( prop & TestCaseInfo::IsHidden ) != 0 )
                         isHidden = true;
                     else if( prop == TestCaseInfo::None )
                         enforceNotReservedTag( tag, _lineInfo );

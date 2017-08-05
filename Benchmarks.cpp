@@ -14,10 +14,13 @@ struct Containers {
     std::vector<size_t> vector_hashes;
     hamt::hash_trie<int> hamt_ints;
     hamt::hash_trie<std::string> hamt_strings;
+    hamt::hash_trie<size_t> hamt_hashes;
     std::set<std::string> set_strings;
     std::set<int> set_ints;
+    std::set<size_t> set_hashes;
     std::unordered_set<std::string> unordered_set_strings;
     std::unordered_set<int> unordered_set_ints;
+    std::unordered_set<size_t> unordered_set_hashes;
 
     Containers( size_t size ) {
         vector_strings.reserve( size );
@@ -54,7 +57,11 @@ struct Containers {
             set_strings.insert( str );
             unordered_set_strings.insert( str );
 
-            vector_hashes.push_back( std::hash<std::string>()( str ) );
+            auto hash = std::hash<std::string>()( str );
+            vector_hashes.push_back( hash );
+            hamt_hashes.insert( hash );
+            set_hashes.insert( hash );
+            unordered_set_hashes.insert( hash );
         }
     }
 };
@@ -79,7 +86,7 @@ int testFind( Src const& src, Dest& dest ) {
     return count;
 }
 
-TEST_CASE( "benchmarks", "[.][!benchmark]" ) {
+TEST_CASE( "benchmarks", "[!benchmark]" ) {
 
     static Containers containers( num );
     
@@ -149,15 +156,15 @@ TEST_CASE( "benchmarks", "[.][!benchmark]" ) {
         int count = 0;
 
         BENCHMARK("hash_trie<hash>::find" ) {
-            count += testFind( containers.vector_hashes, containers.hamt_ints );
+            count += testFind( containers.vector_hashes, containers.hamt_hashes );
         }
 
         BENCHMARK("set<hash>::find" ) {
-            count = testFind( containers.vector_hashes, containers.set_ints );
+            count = testFind( containers.vector_hashes, containers.set_hashes );
         }
 
         BENCHMARK("unordered_set<hash>::find" ) {
-            count = testFind( containers.vector_hashes, containers.unordered_set_ints );
+            count = testFind( containers.vector_hashes, containers.unordered_set_hashes );
         }
 
         CHECK( count > 0 );
