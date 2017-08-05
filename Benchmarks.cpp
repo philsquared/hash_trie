@@ -27,6 +27,7 @@ struct Containers {
         auto len = static_cast<size_t>( std::ceil(std::log( size )/std::log(64)) );
         std::vector<size_t> indices(size, 0);
         std::string str(len, '-');
+        std::cout << "Preparing test data";
         for( size_t i =0; i < size; ++i ) {
             if( i % (size/10) == 0 ) {
                 std::cout << ".";
@@ -78,7 +79,7 @@ int testFind( Src const& src, Dest& dest ) {
     return count;
 }
 
-TEST_CASE( "benchmarks", "[benchmarks]" ) {
+TEST_CASE( "benchmarks", "[!benchmark]" ) {
 
     static Containers containers( num );
 

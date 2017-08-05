@@ -1,6 +1,6 @@
 /*
  *  Catch v2.0.0-develop.1
- *  Generated: 2017-08-04 23:55:30.551855
+ *  Generated: 2017-08-05 11:29:14.014889
  *  ----------------------------------------------------------
  *  This file has been merged from multiple headers. Please don't edit it directly
  *  Copyright (c) 2017 Two Blue Cubes Ltd. All rights reserved.
@@ -1803,7 +1803,8 @@ namespace Catch {
             ShouldFail = 1 << 2,
             MayFail = 1 << 3,
             Throws = 1 << 4,
-            NonPortable = 1 << 5
+            NonPortable = 1 << 5,
+            Benchmark = 1 << 6
         };
 
         TestCaseInfo(   std::string const& _name,
@@ -9059,6 +9060,8 @@ namespace Catch {
             return TestCaseInfo::MayFail;
         else if( tag == "!nonportable" )
             return TestCaseInfo::NonPortable;
+        else if( tag == "!benchmark" )
+            return static_cast<TestCaseInfo::SpecialProperties>( TestCaseInfo::Benchmark | TestCaseInfo::IsHidden );
         else
             return TestCaseInfo::None;
     }
@@ -10858,10 +10861,10 @@ namespace Catch {
         :   StreamingReporterBase( config ),
             m_tablePrinter( config.stream(),
                             {
-                                { "benchmark name", CATCH_CONFIG_CONSOLE_WIDTH-38, ColumnInfo::Left },
+                                { "benchmark name", CATCH_CONFIG_CONSOLE_WIDTH-42, ColumnInfo::Left },
                                 { "iters", 8, ColumnInfo::Right },
-                                { "elapsed ns", 12, ColumnInfo::Right },
-                                { "average", 12, ColumnInfo::Right }
+                                { "elapsed ns", 14, ColumnInfo::Right },
+                                { "average", 14, ColumnInfo::Right }
                             } )
         {}
         ~ConsoleReporter() override;
