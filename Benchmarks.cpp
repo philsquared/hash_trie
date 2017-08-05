@@ -79,7 +79,7 @@ int testFind( Src const& src, Dest& dest ) {
     return count;
 }
 
-TEST_CASE( "benchmarks", "[!benchmark]" ) {
+TEST_CASE( "benchmarks", "[.][!benchmark]" ) {
 
     static Containers containers( num );
     
