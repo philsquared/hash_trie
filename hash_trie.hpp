@@ -266,7 +266,6 @@ namespace hamt {
             m_hash( hash )
         {}
 
-        leaf_node( size_t size, size_t hash ) : node( node_type::leaf ), m_size( size ), m_hash( hash ) {}
         ~leaf_node() {
             for( size_t i=0; i < m_size; ++i )
                 m_values[i].~T();
@@ -770,7 +769,7 @@ namespace hamt {
 
     template<typename T>
     class shared_hash_trie { // NOLINT
-        static_assert( std::is_trivially_copyable<hash_trie_data<T>>::value, "hash_trie_data must be trivially copyable to be used atomically" );
+        static_assert( std::is_trivially_copyable<hash_trie_data<T>>::value,
                        "hash_trie_data must be trivially copyable to be used atomically" );
 
         std::atomic<hash_trie_data<T>> m_data;
@@ -795,7 +794,7 @@ namespace hamt {
         }
 
         auto get() const -> hash_trie<T> {
-            return data();
+            return hash_trie<T>( data() );
         }
 
         auto start_transaction() -> hash_trie_transaction<T>;
