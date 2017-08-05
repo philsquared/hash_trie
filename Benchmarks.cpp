@@ -82,10 +82,10 @@ int testFind( Src const& src, Dest& dest ) {
 TEST_CASE( "benchmarks", "[!benchmark]" ) {
 
     static Containers containers( num );
-
-    int count = 0;
+    
 
     SECTION ( "insert ints" ) {
+        
         std::set<int> set_ints;
         BENCHMARK( "set<int>::insert" ) {
             for( int i =0; i < num; ++i )
@@ -109,54 +109,57 @@ TEST_CASE( "benchmarks", "[!benchmark]" ) {
     }
 
     SECTION ( "find ints" ) {
+        int count = 0;
+        
         BENCHMARK("hash_trie<int>::find" ) {
-            count = testFind( containers.vector_ints, containers.hamt_ints );
+            count += testFind( containers.vector_ints, containers.hamt_ints );
         }
-        CHECK( count > 0 );
-
+        
         BENCHMARK("set<int>::find" ) {
-            count = testFind( containers.vector_ints, containers.set_ints );
+            count += testFind( containers.vector_ints, containers.set_ints );
         }
-        CHECK( count > 0 );
-
+        
         BENCHMARK("unordered_set<int>::find" ) {
-            count = testFind( containers.vector_ints, containers.unordered_set_ints );
+            count += testFind( containers.vector_ints, containers.unordered_set_ints );
         }
+
         CHECK( count > 0 );
     }
 
 
     SECTION ( "find strings" ) {
+        int count = 0;
+
         BENCHMARK("hash_trie<string>::find" ) {
-            count = testFind( containers.vector_strings, containers.hamt_strings );
+            count += testFind( containers.vector_strings, containers.hamt_strings );
         }
-        CHECK( count > 0 );
 
         BENCHMARK("set<string>::find" ) {
-            count = testFind( containers.vector_strings, containers.set_strings );
+            count += testFind( containers.vector_strings, containers.set_strings );
         }
-        CHECK( count > 0 );
 
         BENCHMARK("unordered_set<string>::find" ){
-            count = testFind( containers.vector_strings, containers.unordered_set_strings );
+            count += testFind( containers.vector_strings, containers.unordered_set_strings );
         }
+
         CHECK( count > 0 );
     }
 
     SECTION ( "find hashes" ) {
+        int count = 0;
+
         BENCHMARK("hash_trie<hash>::find" ) {
-            count = testFind( containers.vector_hashes, containers.hamt_ints );
+            count += testFind( containers.vector_hashes, containers.hamt_ints );
         }
-        CHECK( count > 0 );
 
         BENCHMARK("set<hash>::find" ) {
             count = testFind( containers.vector_hashes, containers.set_ints );
         }
-        CHECK( count > 0 );
 
         BENCHMARK("unordered_set<hash>::find" ) {
             count = testFind( containers.vector_hashes, containers.unordered_set_ints );
         }
+
         CHECK( count > 0 );
     }
 
