@@ -3,6 +3,7 @@
 #include "catch.hpp"
 
 #include <iostream>
+#include <set>
 
 TEST_CASE( "iterate" ) {
 
