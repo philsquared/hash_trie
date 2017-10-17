@@ -843,7 +843,7 @@ namespace hamt {
         template<typename L>
         void update_with(L const &updateTask) {
             while( true ) {
-                hash_trie<int> copy( m_baseData );
+                hash_trie<T> copy( m_baseData );
                 updateTask( copy );
 
                 // If we didn't change, don't do anything
