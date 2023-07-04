@@ -274,7 +274,7 @@ namespace hamt {
         // Calculates the raw storage size for a leaf type that
         // contains size elements in the array
         static constexpr auto storage_size(size_t size) {
-            return sizeof(leaf_node) + sizeof(T*[size-1]);
+            return sizeof(leaf_node) + sizeof(T)*(size-1);
         }
 
         // Creates a new leaf_node type with enough additional storage for
